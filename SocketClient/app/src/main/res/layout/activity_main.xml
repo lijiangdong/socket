@@ -42,4 +42,24 @@
             android:text="发送" />
     </LinearLayout>
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/connect_btn"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="连接"/>
+
+        <Button
+            android:id="@+id/disconnect_btn"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="断开连接"/>
+    </LinearLayout>
+
+
 </LinearLayout>

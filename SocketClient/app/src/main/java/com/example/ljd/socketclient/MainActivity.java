@@ -10,6 +10,7 @@ import android.text.TextUtils;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -38,22 +39,25 @@ public class MainActivity extends AppCompatActivity{
 
     private PrintWriter mPrintWriter;
     private Socket mClientSocket;
+    private boolean mIsConnectServer = false;
 
     @SuppressLint("HandlerLeak")
     private Handler mHandler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
             switch (msg.what) {
+
                 case MESSAGE_RECEIVE_NEW_MSG: {
                     mMessageTextView.setText(mMessageTextView.getText()
                             + (String) msg.obj);
                     break;
                 }
                 case MESSAGE_SOCKET_CONNECTED: {
-                    break;
+                    Toast.makeText(MainActivity.this,"连接服务端成功",Toast.LENGTH_SHORT).show();
                 }
                 default:
                     break;
+
             }
         }
     };
@@ -63,39 +67,37 @@ public class MainActivity extends AppCompatActivity{
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
-        new Thread() {
-            @Override
-            public void run() {
-                connectTCPServer();
-            }
-        }.start();
-    }
 
+    }
 
     @Override
     protected void onDestroy() {
         ButterKnife.unbind(this);
-        if (mClientSocket != null) {
-            try {
-                mClientSocket.shutdownInput();
-                mClientSocket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
+        disConnectServer();
         super.onDestroy();
     }
 
-    @OnClick(R.id.send_btn)
-    public void onClick(View v) {
-        final String msg = mMessageEditText.getText().toString();
-        if (!TextUtils.isEmpty(msg) && mPrintWriter != null) {
-            mPrintWriter.println(msg);
-            mMessageEditText.setText("");
-            String time = formatDateTime(System.currentTimeMillis());
-            final String showedMsg = "self " + time + ":" + msg + "\n";
-            mMessageTextView.setText(mMessageTextView.getText() + showedMsg);
+    @OnClick({R.id.send_btn,R.id.connect_btn,R.id.disconnect_btn})
+    public void onClickButton(View v) {
+
+        switch (v.getId()){
+            case R.id.send_btn:
+                sendMessageToServer();
+                break;
+            case R.id.connect_btn:
+                new Thread() {
+                    @Override
+                    public void run() {
+                        connectServer();
+                    }
+                }.start();
+                break;
+            case R.id.disconnect_btn:
+                Toast.makeText(MainActivity.this,"已经断开连接",Toast.LENGTH_SHORT).show();
+                disConnectServer();
+                break;
         }
+
     }
 
     @SuppressLint("SimpleDateFormat")
@@ -103,15 +105,18 @@ public class MainActivity extends AppCompatActivity{
         return new SimpleDateFormat("(HH:mm:ss)").format(new Date(time));
     }
 
-    private void connectTCPServer() {
-        Socket socket = null;
-        while (socket == null) {
+    private void connectServer() {
+
+        if (mIsConnectServer)
+            return;
+
+        while (mClientSocket == null) {
             try {
-                socket = new Socket("localhost", 8688);
-                mClientSocket = socket;
+                mClientSocket = new Socket("localhost", 8688);
                 mPrintWriter = new PrintWriter(new BufferedWriter(
-                        new OutputStreamWriter(socket.getOutputStream())), true);
-                mHandler.sendEmptyMessage(MESSAGE_SOCKET_CONNECTED);
+                        new OutputStreamWriter(mClientSocket.getOutputStream())), true);
+                mIsConnectServer = true;
+                mHandler.obtainMessage(MESSAGE_SOCKET_CONNECTED).sendToTarget();
             } catch (IOException e) {
                 SystemClock.sleep(1000);
             }
@@ -120,7 +125,7 @@ public class MainActivity extends AppCompatActivity{
         try {
             // 接收服务器端的消息
             BufferedReader br = new BufferedReader(new InputStreamReader(
-                    socket.getInputStream()));
+                    mClientSocket.getInputStream()));
             while (!MainActivity.this.isFinishing()) {
                 String msg = br.readLine();
                 if (msg != null) {
@@ -133,9 +138,37 @@ public class MainActivity extends AppCompatActivity{
             }
             mPrintWriter.close();
             br.close();
-            socket.close();
+            mClientSocket.close();
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    private void disConnectServer(){
+        mIsConnectServer = false;
+        if (mClientSocket != null) {
+            try {
+                mClientSocket.shutdownInput();
+                mClientSocket.close();
+                mClientSocket = null;
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void sendMessageToServer(){
+        if (!mIsConnectServer){
+            Toast.makeText(this,"没有连接上服务端，请重新连接",Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final String msg = mMessageEditText.getText().toString();
+        if (!TextUtils.isEmpty(msg) && mPrintWriter != null) {
+            mPrintWriter.println(msg);
+            mMessageEditText.setText("");
+            String time = formatDateTime(System.currentTimeMillis());
+            final String showedMsg = "client " + time + ":" + msg + "\n";
+            mMessageTextView.setText(mMessageTextView.getText() + showedMsg);
         }
     }
 }
