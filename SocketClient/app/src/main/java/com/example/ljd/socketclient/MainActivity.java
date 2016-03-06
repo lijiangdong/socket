@@ -28,8 +28,9 @@ import butterknife.OnClick;
 
 public class MainActivity extends AppCompatActivity{
 
-    private static final int MESSAGE_RECEIVE_NEW_MSG = 1;
-    private static final int MESSAGE_SOCKET_CONNECTED = 2;
+    private static final int RECEIVE_NEW_MESSAGE = 1;
+    private static final int SOCKET_CONNECT_SUCCESS = 2;
+    private static final int SOCKET_CONNECT_FAIL = 3;
 
     @Bind(R.id.msg_container)
     TextView mMessageTextView;
@@ -47,14 +48,18 @@ public class MainActivity extends AppCompatActivity{
         public void handleMessage(Message msg) {
             switch (msg.what) {
 
-                case MESSAGE_RECEIVE_NEW_MSG: {
+                case RECEIVE_NEW_MESSAGE:
                     mMessageTextView.setText(mMessageTextView.getText()
                             + (String) msg.obj);
                     break;
-                }
-                case MESSAGE_SOCKET_CONNECTED: {
+
+                case SOCKET_CONNECT_SUCCESS:
                     Toast.makeText(MainActivity.this,"连接服务端成功",Toast.LENGTH_SHORT).show();
-                }
+                    break;
+
+                case SOCKET_CONNECT_FAIL:
+                    Toast.makeText(MainActivity.this,"连接服务端失败，请重新尝试",Toast.LENGTH_SHORT).show();
+                    break;
                 default:
                     break;
 
@@ -110,15 +115,21 @@ public class MainActivity extends AppCompatActivity{
         if (mIsConnectServer)
             return;
 
+        int count = 0;
         while (mClientSocket == null) {
             try {
-                mClientSocket = new Socket("localhost", 8688);
+                mClientSocket = new Socket("10.10.14.160", 8688);
                 mPrintWriter = new PrintWriter(new BufferedWriter(
                         new OutputStreamWriter(mClientSocket.getOutputStream())), true);
                 mIsConnectServer = true;
-                mHandler.obtainMessage(MESSAGE_SOCKET_CONNECTED).sendToTarget();
+                mHandler.obtainMessage(SOCKET_CONNECT_SUCCESS).sendToTarget();
             } catch (IOException e) {
                 SystemClock.sleep(1000);
+                count++;
+                if (count == 5){
+                    mHandler.obtainMessage(SOCKET_CONNECT_FAIL).sendToTarget();
+                    return;
+                }
             }
         }
 
@@ -132,7 +143,7 @@ public class MainActivity extends AppCompatActivity{
                     String time = formatDateTime(System.currentTimeMillis());
                     final String showedMsg = "server " + time + ":" + msg
                             + "\n";
-                    mHandler.obtainMessage(MESSAGE_RECEIVE_NEW_MSG, showedMsg)
+                    mHandler.obtainMessage(RECEIVE_NEW_MESSAGE, showedMsg)
                             .sendToTarget();
                 }
             }
