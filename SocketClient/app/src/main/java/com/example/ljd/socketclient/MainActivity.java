@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -32,11 +33,11 @@ public class MainActivity extends AppCompatActivity{
     private static final int SOCKET_CONNECT_SUCCESS = 2;
     private static final int SOCKET_CONNECT_FAIL = 3;
 
-    @Bind(R.id.msg_container)
-    TextView mMessageTextView;
-
     @Bind(R.id.msg_edit_text)
     EditText mMessageEditText;
+
+    @Bind(R.id.show_linear)
+    LinearLayout mShowLinear;
 
     private PrintWriter mPrintWriter;
     private Socket mClientSocket;
@@ -49,8 +50,9 @@ public class MainActivity extends AppCompatActivity{
             switch (msg.what) {
 
                 case RECEIVE_NEW_MESSAGE:
-                    mMessageTextView.setText(mMessageTextView.getText()
-                            + (String) msg.obj);
+                    TextView textView = new TextView(MainActivity.this);
+                    textView.setText((String)msg.obj);
+                    mShowLinear.addView(textView);
                     break;
 
                 case SOCKET_CONNECT_SUCCESS:
@@ -105,8 +107,7 @@ public class MainActivity extends AppCompatActivity{
 
     }
 
-    @SuppressLint("SimpleDateFormat")
-    private String formatDateTime(long time) {
+    private String getTime(long time) {
         return new SimpleDateFormat("(HH:mm:ss)").format(new Date(time));
     }
 
@@ -135,20 +136,19 @@ public class MainActivity extends AppCompatActivity{
 
         try {
             // 接收服务器端的消息
-            BufferedReader br = new BufferedReader(new InputStreamReader(
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(
                     mClientSocket.getInputStream()));
             while (!MainActivity.this.isFinishing()) {
-                String msg = br.readLine();
+                String msg = bufferedReader.readLine();
                 if (msg != null) {
-                    String time = formatDateTime(System.currentTimeMillis());
-                    final String showedMsg = "server " + time + ":" + msg
-                            + "\n";
+                    String time = getTime(System.currentTimeMillis());
+                    final String showedMsg = "server " + time + ":" + msg;
                     mHandler.obtainMessage(RECEIVE_NEW_MESSAGE, showedMsg)
                             .sendToTarget();
                 }
             }
             mPrintWriter.close();
-            br.close();
+            bufferedReader.close();
             mClientSocket.close();
         } catch (IOException e) {
             e.printStackTrace();
@@ -177,9 +177,11 @@ public class MainActivity extends AppCompatActivity{
         if (!TextUtils.isEmpty(msg) && mPrintWriter != null) {
             mPrintWriter.println(msg);
             mMessageEditText.setText("");
-            String time = formatDateTime(System.currentTimeMillis());
-            final String showedMsg = "client " + time + ":" + msg + "\n";
-            mMessageTextView.setText(mMessageTextView.getText() + showedMsg);
+            String time = getTime(System.currentTimeMillis());
+            final String showedMsg = "client " + time + ":" + msg;
+            TextView textView = new TextView(this);
+            textView.setText(showedMsg);
+            mShowLinear.addView(textView);
         }
     }
 }

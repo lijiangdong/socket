@@ -1,7 +1,15 @@
 package com.example.ljd.socketserver;
 
+import android.os.Handler;
+import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.text.TextUtils;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -11,94 +19,123 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Random;
+import java.sql.Date;
+import java.text.SimpleDateFormat;
 
-public class MainActivity extends AppCompatActivity {
 
+import butterknife.Bind;
+import butterknife.ButterKnife;
 
-    private boolean mIsServerDestroy = false;
-    private String[] mDefinedMessages = new String[] {
-            "你好啊，哈哈",
-            "请问你叫什么名字呀？",
-            "今天北京天气不错啊，shy",
-            "你知道吗？我可是可以和多个人同时聊天的哦",
-            "给你讲个笑话吧：据说爱笑的人运气不会太差，不知道真假。"
+public class MainActivity extends AppCompatActivity implements View.OnClickListener{
+
+    @Bind(R.id.show_linear)
+    LinearLayout mShowLinear;
+
+    @Bind(R.id.msg_edit_text)
+    EditText mMessageEditText;
+
+    private ServerSocket mServerSocket;
+    private Button mSendButton;
+    private PrintWriter mPrintWriter;
+    private Handler mHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            if (msg.what == 0){
+                TextView textView = new TextView(MainActivity.this);
+                textView.setText((String)msg.obj);
+                mShowLinear.addView(textView);
+            }
+            super.handleMessage(msg);
+        }
     };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        new Thread(new TcpServer()).start();
+        ButterKnife.bind(this);
+        mSendButton = (Button)findViewById(R.id.send_btn);
+        try {
+            mServerSocket = new ServerSocket(8688);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        mSendButton.setOnClickListener(MainActivity.this);
+        new Thread(new AcceptClient()).start();
     }
 
 
     @Override
     public void onDestroy() {
-        mIsServerDestroy = true;
+        ButterKnife.unbind(this);
+        if (mServerSocket != null){
+            try {
+                mServerSocket.close();
+                mServerSocket = null;
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
         super.onDestroy();
     }
 
-    private class TcpServer implements Runnable {
+    @Override
+    public void onClick(View v) {
+        final String msg = mMessageEditText.getText().toString();
+        if (!TextUtils.isEmpty(msg) && mPrintWriter != null) {
+            mPrintWriter.println(msg);
+            mMessageEditText.setText("");
+            String time = getTime(System.currentTimeMillis());
+            final String showedMsg = "server " + time + ":" + msg;
+            TextView textView = new TextView(this);
+            textView.setText(showedMsg);
+            mShowLinear.addView(textView);
+        }
+    }
 
-        @SuppressWarnings("resource")
+    private String getTime(long time) {
+        return new SimpleDateFormat("(HH:mm:ss)").format(new Date(time));
+    }
+
+    class AcceptClient implements Runnable{
+
         @Override
         public void run() {
-            ServerSocket serverSocket = null;
             try {
-                serverSocket = new ServerSocket(8688);
-            } catch (IOException e) {
-                System.err.println("establish tcp server failed, port:8688");
-                e.printStackTrace();
-                return;
-            }
-
-            while (!mIsServerDestroy) {
-                try {
-                    // 接受客户端请求
-                    final Socket client = serverSocket.accept();
-                    System.out.println("accept");
-                    new Thread() {
-                        @Override
-                        public void run() {
-                            try {
-                                responseClient(client);
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                        };
-                    }.start();
-
-                } catch (IOException e) {
-                    e.printStackTrace();
+                Socket clientSocket = null;
+                while (clientSocket == null){
+                    clientSocket = mServerSocket.accept();
+                    mPrintWriter = new PrintWriter(new BufferedWriter(
+                            new OutputStreamWriter(clientSocket.getOutputStream())), true);
                 }
-            }
-        }
-    }
+                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(
+                        clientSocket.getInputStream()));
+                while (!MainActivity.this.isFinishing()) {
+                    String msg = bufferedReader.readLine();
+                    if (msg != null) {
+                        String time = getTime(System.currentTimeMillis());
+                        final String showedMsg = "client " + time + ":" + msg;
+                        mHandler.obtainMessage(0, showedMsg)
+                                .sendToTarget();
+                    }
+                }
+                bufferedReader.close();
+                clientSocket.close();
+                mPrintWriter.close();
 
-    private void responseClient(Socket client) throws IOException {
-        // 用于接收客户端消息
-        BufferedReader in = new BufferedReader(new InputStreamReader(
-                client.getInputStream()));
-        // 用于向客户端发送消息
-        PrintWriter out = new PrintWriter(new BufferedWriter(
-                new OutputStreamWriter(client.getOutputStream())), true);
-        out.println("欢迎来到聊天室！");
-        while (!mIsServerDestroy) {
-            String str = in.readLine();
-            System.out.println("msg from client:" + str);
-            if (str == null) {
-                break;
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            int i = new Random().nextInt(mDefinedMessages.length);
-            String msg = mDefinedMessages[i];
-            out.println(msg);
-            System.out.println("send :" + msg);
         }
-        System.out.println("client quit.");
-        // 关闭流
-        out.close();
-        in.close();
-        client.close();
     }
 }
+
+
+
+
+
+
+
+
+
+
