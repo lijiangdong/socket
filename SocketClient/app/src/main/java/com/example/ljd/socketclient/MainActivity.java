@@ -119,7 +119,7 @@ public class MainActivity extends AppCompatActivity{
         int count = 0;
         while (mClientSocket == null) {
             try {
-                mClientSocket = new Socket("10.10.14.160", 8688);
+                mClientSocket = new Socket("10.10.14.160", 8088);
                 mPrintWriter = new PrintWriter(new BufferedWriter(
                         new OutputStreamWriter(mClientSocket.getOutputStream())), true);
                 mIsConnectServer = true;

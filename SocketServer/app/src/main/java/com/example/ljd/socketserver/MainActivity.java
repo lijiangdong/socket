@@ -5,8 +5,6 @@ import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.text.TextUtils;
-import android.view.View;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -25,8 +23,9 @@ import java.text.SimpleDateFormat;
 
 import butterknife.Bind;
 import butterknife.ButterKnife;
+import butterknife.OnClick;
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener{
+public class MainActivity extends AppCompatActivity{
 
     @Bind(R.id.show_linear)
     LinearLayout mShowLinear;
@@ -35,7 +34,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     EditText mMessageEditText;
 
     private ServerSocket mServerSocket;
-    private Button mSendButton;
     private PrintWriter mPrintWriter;
     private Handler mHandler = new Handler() {
         @Override
@@ -54,13 +52,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
-        mSendButton = (Button)findViewById(R.id.send_btn);
         try {
-            mServerSocket = new ServerSocket(8688);
+            mServerSocket = new ServerSocket(8088);
         } catch (IOException e) {
             e.printStackTrace();
         }
-        mSendButton.setOnClickListener(MainActivity.this);
         new Thread(new AcceptClient()).start();
     }
 
@@ -79,10 +75,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onDestroy();
     }
 
-    @Override
-    public void onClick(View v) {
+    @OnClick(R.id.send_btn)
+    public void onClickButton() {
         final String msg = mMessageEditText.getText().toString();
         if (!TextUtils.isEmpty(msg) && mPrintWriter != null) {
+            //将消息写入到流中
             mPrintWriter.println(msg);
             mMessageEditText.setText("");
             String time = getTime(System.currentTimeMillis());
@@ -111,6 +108,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(
                         clientSocket.getInputStream()));
                 while (!MainActivity.this.isFinishing()) {
+                    //读取客户端发来的消息
                     String msg = bufferedReader.readLine();
                     if (msg != null) {
                         String time = getTime(System.currentTimeMillis());
